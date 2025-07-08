@@ -1,212 +1,206 @@
 # 🦅 BirdEye Sniper Bot
 
-A sophisticated Telegram bot for automated Solana memecoin sniping operations with military-grade precision and tactical interface.
+**The Ultimate Memecoin Copy-Trading Telegram Bot**
 
-## 🎯 Features
+A sophisticated, modular Telegram bot for real-time wallet monitoring and memecoin sniping on the Solana blockchain. Built with military-grade precision and reliability.
 
-### 🔐 Security & Authorization
-- **Dynamic Group Admin Detection**: Automatically detects Telegram group administrators
-- **Dual Authorization System**: Access via ADMIN_IDS or group admin status
-- **Robust Error Handling**: Handles Telegram API errors without crashing
-- **Military-grade Security**: Professional tactical interface with secure operations
+## ✨ Features
 
-### 💰 Wallet Operations
-- **Real-time Monitoring**: Continuous wallet balance surveillance (30-second intervals)
-- **Instant Notifications**: Immediate alerts when funds are received (>0.001 SOL)
-- **Auto-deployment**: Smart 30-minute auto-send with 95% balance deployment
-- **Manual Controls**: Commander can deploy or abort operations instantly
-- **Transaction Intelligence**: Enhanced details via Helius API integration
-
-### 🎖️ Command Center
-- **`/sniper`**: Main tactical admin menu with quick actions
-- **`/wallet`**: Comprehensive wallet status and controls
-- **Status Reports**: Automated tactical updates every 3 hours
-- **Professional Interface**: Military-themed messaging (clean and professional)
+- 🎯 **Real-time Wallet Monitoring** - Track multiple wallets simultaneously
+- ⚡ **Lightning-fast Notifications** - Instant alerts for all transactions  
+- 💰 **Balance Change Detection** - Monitor SOL and token balance changes
+- 🔍 **Transaction Analysis** - Detailed breakdown of all wallet activities
+- 🛡️ **Military-grade Security** - End-to-end encrypted communications
+- 📊 **Advanced Analytics** - Comprehensive trading insights
+- 🎮 **Intuitive Interface** - Easy-to-use Telegram commands
+- 🔄 **Auto-deployment** - CI/CD pipeline with health monitoring
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js v18+ 
-- Telegram Bot Token (from @BotFather)
-- Telegram Group ID
-- Solana Wallet Private Key
-- Helius API Key
+- Node.js 18+ 
+- npm or yarn
+- PM2 (for production)
+- Telegram Bot Token
+- Solana RPC endpoint
 
 ### Installation
 
-1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/bird.git
+# Clone repository
+git clone <your-repo-url>
 cd bird
-```
 
-2. **Install dependencies**
-```bash
+# Install dependencies
 npm install
-```
 
-3. **Configure environment**
-```bash
+# Setup environment
 cp .env.example .env
 # Edit .env with your configuration
-```
 
-4. **Convert your private key (if needed)**
-```bash
-node convert_key.js
-```
+# Run setup script
+./setup.sh
 
-5. **Run the bot**
-```bash
+# Start bot
 npm start
-# or
-node index.js
 ```
 
-## ⚙️ Configuration
+## 📁 Project Structure
+
+```
+bird/
+├── index.js                 # Main entry point
+├── src/
+│   ├── bot.js              # Core bot class
+│   ├── config/
+│   │   └── config.js       # Configuration management
+│   ├── modules/
+│   │   ├── userDataManager.js      # User data handling
+│   │   ├── solanaManager.js        # Solana blockchain interface
+│   │   ├── notificationManager.js  # Telegram notifications
+│   │   ├── walletMonitor.js        # Real-time monitoring
+│   │   └── healthCheckService.js   # System health monitoring
+│   ├── handlers/
+│   │   ├── setupHandler.js         # User setup & onboarding
+│   │   └── sniperHandler.js        # Sniper operations
+│   └── utils/
+│       └── errorHandler.js         # Error handling & logging
+├── scripts/
+│   ├── auto-deploy.sh      # Auto-deployment script
+│   ├── backup.sh           # Backup utilities
+│   ├── health-check.sh     # Health monitoring
+│   └── webhook-deploy.sh   # Webhook deployment
+├── .github/
+│   └── workflows/
+│       └── auto-deploy.yml # GitHub Actions CI/CD
+├── logs/                   # Application logs
+├── package.json
+├── ecosystem.config.js     # PM2 configuration
+└── README.md
+```
+
+## 🛠️ Configuration
 
 ### Environment Variables (.env)
-
-```properties
-# Telegram Configuration
-BOT_TOKEN=your_bot_token_here
-GROUP_ID=-1001234567890
-ADMIN_IDS=123456789,987654321
+```bash
+# Bot Configuration
+BOT_TOKEN=your_telegram_bot_token
+GROUP_ID=your_telegram_group_id
+ADMIN_IDS=admin_user_id_1,admin_user_id_2
 
 # Solana Configuration  
-SOLANA_RPC_URL=https://mainnet.helius-rpc.com/?api-key=your_key
-SOLANA_WSS_URL=wss://mainnet.helius-rpc.com/?api-key=your_key
-SOLANA_ADDRESS=your_wallet_address
-SOLANA_PRIVATE_KEY=base64_encoded_private_key
+PRIVATE_KEY=your_base64_encoded_private_key
+RPC_ENDPOINT=https://api.mainnet-beta.solana.com
 
-# Helius API
-HELIUS_API_KEY=your_helius_api_key
+# Optional Settings
+NODE_ENV=production
+LOG_LEVEL=info
+HEALTH_CHECK_INTERVAL=21600000
 ```
 
-### Getting Your Group ID
-1. Add @userinfobot to your Telegram group
-2. The bot will display your group ID (starts with -100)
-3. Use this ID in your `.env` file
+## 📱 Bot Commands
 
-### Private Key Setup
-Your private key must be in base64 format. Use the included converter:
+### User Commands
+- `/start` - Initialize bot setup
+- `/sniper` - Access sniper command center (authorized users)
+- `/status` - View system status
+- `/help` - Show help information
 
+### Admin Commands  
+- `/wallet` - View wallet information (super admin)
+- `/health` - System health check (admin)
+
+## 🎯 Sniper Features
+
+- **Real-time Monitoring** - Track wallet activities instantly
+- **Balance Alerts** - Get notified of all balance changes
+- **Transaction Details** - Full transaction analysis
+- **Multi-wallet Support** - Monitor multiple addresses
+- **Custom Notifications** - Personalized alert settings
+
+## 🔧 Deployment
+
+### Development
 ```bash
-node convert_key.js
+npm run dev
 ```
 
-Or generate a new wallet:
+### Production with PM2
 ```bash
-node -e "const {Keypair} = require('@solana/web3.js'); const kp = Keypair.generate(); console.log('Address:', kp.publicKey.toString()); console.log('Private Key (base64):', Buffer.from(kp.secretKey).toString('base64'));"
+npm run pm2:start
 ```
 
-## 🎖️ Commands
+### Auto-deployment
+The bot includes automatic deployment via GitHub Actions:
 
-### Admin Commands
-- **`/sniper`** - Access the tactical command center
-- **`/wallet`** - View wallet status and controls
+1. Push to `main` branch triggers deployment
+2. System health check performed
+3. Telegram notifications sent with:
+   - Deployment status
+   - System metrics (CPU, memory, disk)
+   - Wallet information
+   - Bot status
 
-### Bot Setup
-- **`/start`** - Initialize bot and begin setup process
-
-## 🔧 Technical Details
-
-### Dependencies
-- **telegraf**: Telegram Bot framework
-- **@solana/web3.js**: Solana blockchain interaction
-- **axios**: HTTP client for API calls
-- **node-cron**: Task scheduling
-- **bs58**: Base58 encoding/decoding
-
-### Architecture
-- **Event-driven**: Responds to wallet balance changes in real-time
-- **Stateful**: Maintains user data and wallet monitoring states
-- **Resilient**: Comprehensive error handling prevents crashes
-- **Modular**: Clean separation of concerns
-
-## 🛡️ Security Features
-
-- **No Private Key Exposure**: Keys stored securely in environment variables
-- **Admin-only Operations**: Multi-layer authorization system
-- **Error Isolation**: Failed operations don't affect bot stability
-- **Clean Logging**: Detailed operational logs without sensitive data
+### Manual Deployment
+```bash
+./scripts/auto-deploy.sh deploy
+```
 
 ## 📊 Monitoring
 
-The bot provides:
-- Real-time balance monitoring
-- Transaction notifications with full details
-- 3-hour status reports
-- Error logging and recovery
+### Health Checks
+- Automatic health monitoring every 6 hours
+- System metrics tracking
+- Performance monitoring
+- Error detection and reporting
+
+### Logging
+- Comprehensive logging system
+- Error tracking and reporting  
 - Performance metrics
+- Audit trails
 
-## 🚨 Error Handling
+## 🔐 Security Features
 
-- **Telegram API Errors**: Graceful handling of 403/blocked user errors
-- **Solana RPC Failures**: Automatic retry mechanisms
-- **Network Issues**: Resilient connection management
-- **Invalid Transactions**: Safe failure modes
+- **Encrypted Private Keys** - Secure key storage
+- **Admin Access Control** - Multi-level authorization
+- **Audit Logging** - Complete activity tracking
+- **Rate Limiting** - Anti-spam protection
+- **Input Validation** - SQL injection prevention
 
-## 🔄 Auto-deployment Logic
+## 🚨 Important Security Notes
 
-1. **Detection**: Monitor wallet for incoming funds (>0.001 SOL)
-2. **Notification**: Immediate alert to Telegram group
-3. **Countdown**: 30-minute auto-send timer starts
-4. **Execution**: Deploy 95% of balance (keeping 5% for fees)
-5. **Confirmation**: Success/failure notification with transaction details
+1. **Private Key Security**: Store your private key securely and never share it
+2. **Admin Access**: Only authorized users can access sensitive commands
+3. **Environment Variables**: Keep your .env file private and secure
+4. **Regular Backups**: Backup your configuration and user data regularly
 
 ## 📈 Performance
 
-- **Response Time**: <1 second for commands
-- **Monitoring Frequency**: 30-second balance checks
-- **Memory Usage**: ~80MB typical operation
-- **Uptime**: 99.9% with proper error handling
-
-## 🔧 Development
-
-### Branch Structure
-- **main**: Production-ready stable code
-- **dev**: Development and testing
-
-### Running in Development
-```bash
-npm run dev
-# or
-NODE_ENV=development node index.js
-```
-
-### Testing
-```bash
-npm test
-```
-
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## ⚠️ Disclaimer
-
-This bot is for educational and legitimate trading purposes only. Users are responsible for:
-- Compliance with local regulations
-- Proper security of private keys
-- Understanding financial risks
-- Using the bot responsibly
+- **Real-time Processing** - Sub-second response times
+- **Scalable Architecture** - Modular design for easy scaling
+- **Memory Efficient** - Optimized for long-running operations
+- **Error Recovery** - Automatic error handling and recovery
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📞 Support
+## 📄 License
 
-For support and questions:
-- Create an issue in this repository
-- Check the documentation in `/docs`
-- Review the troubleshooting guide
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🆘 Support
+
+For technical support or questions:
+- Check the logs in the `logs/` directory
+- Run health check: `npm run health`
+- Contact your system administrator
 
 ---
 
-**🎯 Ready for tactical memecoin operations, Commander!**
+**⚠️ Disclaimer**: This bot is for educational and research purposes. Always comply with applicable laws and regulations when trading cryptocurrencies. Use at your own risk.

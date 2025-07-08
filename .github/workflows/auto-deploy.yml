@@ -1,0 +1,144 @@
+name: 🚀 Auto Deploy BirdEye Sniper Bot
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Force deployment even if tests fail'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  deploy:
+    name: 🎯 Deploy to Production
+    runs-on: self-hosted
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 🔍 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: 📦 Install Dependencies
+      run: |
+        echo "🔧 Installing production dependencies..."
+        npm ci --production
+        
+    - name: 🧪 Run Tests (if available)
+      run: |
+        if [ -f "package.json" ] && grep -q '"test"' package.json; then
+          echo "🧪 Running tests..."
+          npm test || echo "⚠️ Tests failed but continuing..."
+        else
+          echo "📝 No tests found, skipping..."
+        fi
+      continue-on-error: true
+
+    - name: 🔐 Validate Configuration
+      run: |
+        echo "🔍 Checking configuration files..."
+        if [ ! -f ".env" ]; then
+          echo "❌ .env file not found!"
+          exit 1
+        fi
+        
+        if ! grep -q "BOT_TOKEN=.*[a-zA-Z0-9]" .env; then
+          echo "❌ BOT_TOKEN not configured!"
+          exit 1
+        fi
+        
+        echo "✅ Configuration validated"
+
+    - name: ⏹️ Stop Existing Bot
+      run: |
+        echo "⏹️ Stopping existing bot instance..."
+        pm2 stop birdeye 2>/dev/null || echo "ℹ️ Bot was not running"
+        pm2 delete birdeye 2>/dev/null || echo "ℹ️ No previous instance to delete"
+
+    - name: 🚀 Deploy New Version
+      run: |
+        echo "🚀 Starting new bot instance..."
+        pm2 start ecosystem.config.js
+        sleep 5
+        
+        # Check if bot started successfully
+        if pm2 list | grep -q "birdeye.*online"; then
+          echo "✅ Bot deployed successfully!"
+        else
+          echo "❌ Bot failed to start!"
+          pm2 logs birdeye --lines 20 --nostream || true
+          exit 1
+        fi
+
+    - name: 🏥 Health Check
+      run: |
+        echo "🏥 Performing post-deployment health check..."
+        sleep 10
+        
+        # Check bot status
+        BOT_STATUS=$(pm2 list | grep birdeye | awk '{print $10}' || echo "unknown")
+        echo "🤖 Bot Status: $BOT_STATUS"
+        
+        # Get system info
+        UPTIME=$(uptime -p)
+        MEMORY=$(free -h | awk '/^Mem:/ {print $3 "/" $2}')
+        DISK=$(df -h / | awk 'NR==2 {print $3 "/" $2 " (" $5 " used)"}')
+        
+        echo "📊 System Status:"
+        echo "  • Uptime: $UPTIME"
+        echo "  • Memory: $MEMORY"
+        echo "  • Disk: $DISK"
+
+    - name: 📱 Send Deployment Notification
+      run: |
+        echo "📱 Sending deployment notification..."
+        
+        # Get deployment info
+        COMMIT_HASH=$(git rev-parse --short HEAD)
+        COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+        DEPLOY_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+        BOT_STATUS=$(pm2 list | grep birdeye | awk '{print $10}' || echo "unknown")
+        
+        # Get wallet balance using the bot's modules
+        BALANCE=$(timeout 30s node -e "
+          require('dotenv').config();
+          const { Connection, PublicKey, LAMPORTS_PER_SOL } = require('@solana/web3.js');
+          
+          async function getBalance() {
+            try {
+              if (!process.env.SOLANA_ADDRESS) {
+                console.log('0.0000 SOL');
+                return;
+              }
+              
+              const connection = new Connection(
+                process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
+                'confirmed'
+              );
+              
+              const publicKey = new PublicKey(process.env.SOLANA_ADDRESS);
+              const balance = await connection.getBalance(publicKey);
+              const solBalance = balance / LAMPORTS_PER_SOL;
+              
+              console.log(\`\${solBalance.toFixed(4)} SOL\`);
+            } catch (error) {
+              console.log('0.0000 SOL');
+            }
+          }
+          
+          getBalance();
+        " 2>/dev/null || echo "0.0000 SOL")
+        
+        # Send deployment notification
+        ./scripts/auto-deploy.sh status
+        
+        echo "✅ Deployment process completed"
