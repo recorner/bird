@@ -22,6 +22,11 @@
     "deploy": "./scripts/auto-deploy.sh deploy",
     "deploy:webhook": "./scripts/auto-deploy.sh webhook",
     "deploy:status": "./scripts/auto-deploy.sh status",
+    "monitor:start": "./scripts/auto-deploy-monitor.sh start",
+    "monitor:stop": "./scripts/auto-deploy-monitor.sh stop",
+    "monitor:restart": "./scripts/auto-deploy-monitor.sh restart",
+    "monitor:status": "./scripts/auto-deploy-monitor.sh status",
+    "monitor:test": "./scripts/auto-deploy-monitor.sh test",
     "test": "echo \"No tests specified\" && exit 0"
   },
   "keywords": [

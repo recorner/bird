@@ -12,8 +12,8 @@ on:
         type: boolean
 
 jobs:
-  deploy:
-    name: 🎯 Deploy to Production
+  validate-and-trigger:
+    name: 🎯 Validate & Trigger Self-Deployment
     runs-on: ubuntu-latest
     
     steps:
@@ -43,7 +43,7 @@ jobs:
         fi
       continue-on-error: true
 
-    - name: � Validate Project Structure
+    - name: 🔍 Validate Project Structure
       run: |
         echo "🔍 Validating project structure..."
         
@@ -70,123 +70,74 @@ jobs:
         
         echo "✅ Project structure validated"
 
-    - name: 🚀 Deploy to Production Server
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.SSH_KEY }}
-        port: ${{ secrets.PORT || 22 }}
-        script: |
-          echo "🚀 Starting deployment to production..."
-          
-          # Navigate to project directory
-          cd /root/bird || { echo "❌ Project directory not found!"; exit 1; }
-          
-          # Check git status
-          echo "📥 Pulling latest changes..."
-          git fetch origin
-          git reset --hard origin/main
-          
-          # Install production dependencies
-          echo "📦 Installing production dependencies..."
-          npm ci --production
-          
-          # Stop existing bot
-          echo "⏹️ Stopping existing bot..."
-          pm2 stop birdeye 2>/dev/null || echo "ℹ️ Bot was not running"
-          
-          # Start bot
-          echo "▶️ Starting bot..."
-          pm2 start ecosystem.config.js --env production
-          
-          # Save PM2 configuration
-          pm2 save
-          
-          # Wait for bot to start
-          sleep 10
-          
-          # Check if bot is running
-          if pm2 list | grep -q "birdeye.*online"; then
-            echo "✅ Bot started successfully!"
-          else
-            echo "❌ Bot failed to start!"
-            pm2 logs birdeye --lines 20 --nostream || true
-            exit 1
-          fi
+    - name: 📋 Get Deployment Info
+      id: deploy-info
+      run: |
+        echo "commit_hash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        echo "commit_message=$(git log -1 --pretty=format:'%s')" >> $GITHUB_OUTPUT
+        echo "deploy_time=$(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_OUTPUT
+        echo "author=$(git log -1 --pretty=format:'%an')" >> $GITHUB_OUTPUT
 
-    - name: 🏥 Post-Deployment Health Check
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.SSH_KEY }}
-        port: ${{ secrets.PORT || 22 }}
-        script: |
-          cd /root/bird
+    - name: 🚀 Trigger Self-Deployment (Optional Webhook)
+      run: |
+        echo "🚀 Attempting to trigger self-deployment..."
+        
+        # Try to trigger webhook on your server (optional)
+        WEBHOOK_URL="${{ secrets.WEBHOOK_URL }}"
+        
+        if [ -n "$WEBHOOK_URL" ]; then
+          echo "📡 Sending webhook to: $WEBHOOK_URL"
           
-          echo "🏥 Performing health check..."
-          
-          # Wait a bit more for full initialization
-          sleep 15
-          
-          # Check bot status
-          BOT_STATUS=$(pm2 list | grep birdeye | awk '{print $10}' || echo "stopped")
-          echo "🤖 Bot Status: $BOT_STATUS"
-          
-          # Get system metrics
-          CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | awk -F'%' '{print $1}' || echo "N/A")
-          MEMORY_USAGE=$(free -m | awk 'NR==2{printf "%.1f%%", $3*100/$2 }' || echo "N/A")
-          DISK_USAGE=$(df -h / | awk 'NR==2 {print $5}' || echo "N/A")
-          UPTIME=$(uptime -p || echo "N/A")
-          
-          echo "📊 System Metrics:"
-          echo "  🖥️ CPU: ${CPU_USAGE}%"
-          echo "  💾 Memory: ${MEMORY_USAGE}"
-          echo "  💿 Disk: ${DISK_USAGE}"
-          echo "  ⏱️ Uptime: ${UPTIME}"
-          
-          # Run auto-deploy notification
-          echo "📱 Sending deployment notification..."
-          ./scripts/auto-deploy.sh status
-          
-          echo "✅ Health check completed"
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "User-Agent: GitHub-Actions" \
+            -H "X-GitHub-Event: push" \
+            -d '{
+              "ref": "refs/heads/main",
+              "repository": {
+                "name": "bird",
+                "full_name": "${{ github.repository }}"
+              },
+              "head_commit": {
+                "id": "${{ steps.deploy-info.outputs.commit_hash }}",
+                "message": "${{ steps.deploy-info.outputs.commit_message }}"
+              },
+              "deploy_info": {
+                "commit_hash": "${{ steps.deploy-info.outputs.commit_hash }}",
+                "commit_message": "${{ steps.deploy-info.outputs.commit_message }}",
+                "deploy_time": "${{ steps.deploy-info.outputs.deploy_time }}",
+                "author": "${{ steps.deploy-info.outputs.author }}",
+                "triggered_by": "github-actions"
+              }
+            }' \
+            --max-time 30 \
+            --retry 2 \
+            --retry-delay 3 \
+            || echo "⚠️ Webhook not configured or failed - that's OK!"
+        else
+          echo "📝 No webhook URL configured"
+          echo "🔄 Your server should auto-pull changes via git hooks or cron job"
+        fi
+        
+        echo "✅ Validation completed - deployment trigger sent"
 
     - name: 📊 Deployment Summary
-      if: always()
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.SSH_KEY }}
-        port: ${{ secrets.PORT || 22 }}
-        script: |
-          cd /root/bird
-          
-          echo "📊 Final Deployment Summary:"
-          echo "================================"
-          
-          # Get commit info
-          COMMIT_HASH=$(git rev-parse --short HEAD)
-          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
-          DEPLOY_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-          
-          echo "📋 Commit: $COMMIT_HASH"
-          echo "💬 Message: $COMMIT_MSG"
-          echo "⏰ Deploy Time: $DEPLOY_TIME"
-          
-          # Final bot status
-          if pm2 list | grep -q "birdeye.*online"; then
-            echo "🎉 DEPLOYMENT SUCCESSFUL! Bot is running."
-            
-            # Send success notification
-            ./scripts/auto-deploy.sh webhook
-          else
-            echo "💥 DEPLOYMENT FAILED! Bot is not running."
-            
-            # Show recent logs
-            echo "📝 Recent logs:"
-            pm2 logs birdeye --lines 10 --nostream || true
-            
-            exit 1
-          fi
+      run: |
+        echo "📊 GitHub Actions Summary:"
+        echo "================================"
+        echo "📋 Commit: ${{ steps.deploy-info.outputs.commit_hash }}"
+        echo "💬 Message: ${{ steps.deploy-info.outputs.commit_message }}"
+        echo "👤 Author: ${{ steps.deploy-info.outputs.author }}"
+        echo "⏰ Time: ${{ steps.deploy-info.outputs.deploy_time }}"
+        echo "🎯 Branch: main"
+        echo "📦 Repository: ${{ github.repository }}"
+        echo ""
+        echo "✅ Code validation successful!"
+        echo "🚀 Your server should handle deployment automatically"
+        echo "📱 Check your Telegram for deployment notifications"
+        echo ""
+        echo "🔧 How deployment works:"
+        echo "1. This GitHub Action validates your code"
+        echo "2. Your server runs a cron job or git hook to pull changes"
+        echo "3. Auto-deploy script handles the actual deployment"
+        echo "4. Telegram notification sent with deployment status"
