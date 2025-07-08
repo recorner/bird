@@ -22,11 +22,11 @@
     "deploy": "./scripts/auto-deploy.sh deploy",
     "deploy:webhook": "./scripts/auto-deploy.sh webhook",
     "deploy:status": "./scripts/auto-deploy.sh status",
-    "monitor:start": "./scripts/auto-deploy-monitor.sh start",
-    "monitor:stop": "./scripts/auto-deploy-monitor.sh stop",
-    "monitor:restart": "./scripts/auto-deploy-monitor.sh restart",
-    "monitor:status": "./scripts/auto-deploy-monitor.sh status",
-    "monitor:test": "./scripts/auto-deploy-monitor.sh test",
+    "monitor:start": "./scripts/auto-update.sh monitor &",
+    "monitor:stop": "pkill -f auto-update.sh || echo 'Monitor not running'",
+    "monitor:restart": "pkill -f auto-update.sh; ./scripts/auto-update.sh monitor &",
+    "monitor:status": "pgrep -f auto-update.sh && echo 'Monitor running' || echo 'Monitor not running'",
+    "monitor:test": "./scripts/auto-update.sh test",
     "test": "echo \"No tests specified\" && exit 0"
   },
   "keywords": [
