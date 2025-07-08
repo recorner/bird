@@ -6,10 +6,19 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "pm2": "pm2 start index.js --name 'BirdEyeSniperBot'",
-    "pm2:stop": "pm2 stop BirdEyeSniperBot",
-    "pm2:restart": "pm2 restart BirdEyeSniperBot",
-    "pm2:logs": "pm2 logs BirdEyeSniperBot"
+    "prod": "NODE_ENV=production node index.js",
+    "deploy": "./scripts/deploy.sh",
+    "health": "./scripts/health-check.sh", 
+    "backup": "./scripts/backup.sh",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop birdeye",
+    "pm2:restart": "pm2 restart birdeye",
+    "pm2:reload": "pm2 reload birdeye",
+    "pm2:logs": "pm2 logs birdeye",
+    "pm2:status": "pm2 status birdeye",
+    "pm2:monit": "pm2 monit",
+    "setup": "npm ci && mkdir -p logs && npm run deploy",
+    "update": "git pull origin main && npm ci --production && pm2 reload birdeye"
   },
   "keywords": [
     "telegram",

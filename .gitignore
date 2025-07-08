@@ -41,8 +41,11 @@ node_modules/
 # User data
 users.json
 
-# PM2 files
-ecosystem.config.js
+# Logs (keep structure but ignore content)
+logs/*.log
+
+# PM2 files (we want to keep ecosystem.config.js in repo now)
+# ecosystem.config.js
 
 # OS generated files
 .DS_Store
