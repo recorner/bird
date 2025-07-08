@@ -14,7 +14,7 @@ on:
 jobs:
   deploy:
     name: 🎯 Deploy to Production
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     
     steps:
     - name: 📥 Checkout Code
@@ -28,10 +28,10 @@ jobs:
         node-version: '18'
         cache: 'npm'
 
-    - name: 📦 Install Dependencies
+    - name: 📦 Install Dependencies for Testing
       run: |
-        echo "🔧 Installing production dependencies..."
-        npm ci --production
+        echo "🔧 Installing dependencies for validation..."
+        npm ci
         
     - name: 🧪 Run Tests (if available)
       run: |
@@ -43,102 +43,150 @@ jobs:
         fi
       continue-on-error: true
 
-    - name: 🔐 Validate Configuration
+    - name: � Validate Project Structure
       run: |
-        echo "🔍 Checking configuration files..."
-        if [ ! -f ".env" ]; then
-          echo "❌ .env file not found!"
+        echo "🔍 Validating project structure..."
+        
+        # Check required files
+        if [ ! -f "index.js" ]; then
+          echo "❌ index.js not found!"
           exit 1
         fi
         
-        if ! grep -q "BOT_TOKEN=.*[a-zA-Z0-9]" .env; then
-          echo "❌ BOT_TOKEN not configured!"
+        if [ ! -f "package.json" ]; then
+          echo "❌ package.json not found!"
           exit 1
         fi
         
-        echo "✅ Configuration validated"
-
-    - name: ⏹️ Stop Existing Bot
-      run: |
-        echo "⏹️ Stopping existing bot instance..."
-        pm2 stop birdeye 2>/dev/null || echo "ℹ️ Bot was not running"
-        pm2 delete birdeye 2>/dev/null || echo "ℹ️ No previous instance to delete"
-
-    - name: 🚀 Deploy New Version
-      run: |
-        echo "🚀 Starting new bot instance..."
-        pm2 start ecosystem.config.js
-        sleep 5
-        
-        # Check if bot started successfully
-        if pm2 list | grep -q "birdeye.*online"; then
-          echo "✅ Bot deployed successfully!"
-        else
-          echo "❌ Bot failed to start!"
-          pm2 logs birdeye --lines 20 --nostream || true
+        if [ ! -f "ecosystem.config.js" ]; then
+          echo "❌ ecosystem.config.js not found!"
           exit 1
         fi
+        
+        if [ ! -d "src" ]; then
+          echo "❌ src directory not found!"
+          exit 1
+        fi
+        
+        echo "✅ Project structure validated"
 
-    - name: 🏥 Health Check
-      run: |
-        echo "🏥 Performing post-deployment health check..."
-        sleep 10
-        
-        # Check bot status
-        BOT_STATUS=$(pm2 list | grep birdeye | awk '{print $10}' || echo "unknown")
-        echo "🤖 Bot Status: $BOT_STATUS"
-        
-        # Get system info
-        UPTIME=$(uptime -p)
-        MEMORY=$(free -h | awk '/^Mem:/ {print $3 "/" $2}')
-        DISK=$(df -h / | awk 'NR==2 {print $3 "/" $2 " (" $5 " used)"}')
-        
-        echo "📊 System Status:"
-        echo "  • Uptime: $UPTIME"
-        echo "  • Memory: $MEMORY"
-        echo "  • Disk: $DISK"
-
-    - name: 📱 Send Deployment Notification
-      run: |
-        echo "📱 Sending deployment notification..."
-        
-        # Get deployment info
-        COMMIT_HASH=$(git rev-parse --short HEAD)
-        COMMIT_MSG=$(git log -1 --pretty=format:"%s")
-        DEPLOY_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-        BOT_STATUS=$(pm2 list | grep birdeye | awk '{print $10}' || echo "unknown")
-        
-        # Get wallet balance using the bot's modules
-        BALANCE=$(timeout 30s node -e "
-          require('dotenv').config();
-          const { Connection, PublicKey, LAMPORTS_PER_SOL } = require('@solana/web3.js');
+    - name: 🚀 Deploy to Production Server
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.PORT || 22 }}
+        script: |
+          echo "🚀 Starting deployment to production..."
           
-          async function getBalance() {
-            try {
-              if (!process.env.SOLANA_ADDRESS) {
-                console.log('0.0000 SOL');
-                return;
-              }
-              
-              const connection = new Connection(
-                process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
-                'confirmed'
-              );
-              
-              const publicKey = new PublicKey(process.env.SOLANA_ADDRESS);
-              const balance = await connection.getBalance(publicKey);
-              const solBalance = balance / LAMPORTS_PER_SOL;
-              
-              console.log(\`\${solBalance.toFixed(4)} SOL\`);
-            } catch (error) {
-              console.log('0.0000 SOL');
-            }
-          }
+          # Navigate to project directory
+          cd /root/bird || { echo "❌ Project directory not found!"; exit 1; }
           
-          getBalance();
-        " 2>/dev/null || echo "0.0000 SOL")
-        
-        # Send deployment notification
-        ./scripts/auto-deploy.sh status
-        
-        echo "✅ Deployment process completed"
+          # Check git status
+          echo "📥 Pulling latest changes..."
+          git fetch origin
+          git reset --hard origin/main
+          
+          # Install production dependencies
+          echo "📦 Installing production dependencies..."
+          npm ci --production
+          
+          # Stop existing bot
+          echo "⏹️ Stopping existing bot..."
+          pm2 stop birdeye 2>/dev/null || echo "ℹ️ Bot was not running"
+          
+          # Start bot
+          echo "▶️ Starting bot..."
+          pm2 start ecosystem.config.js --env production
+          
+          # Save PM2 configuration
+          pm2 save
+          
+          # Wait for bot to start
+          sleep 10
+          
+          # Check if bot is running
+          if pm2 list | grep -q "birdeye.*online"; then
+            echo "✅ Bot started successfully!"
+          else
+            echo "❌ Bot failed to start!"
+            pm2 logs birdeye --lines 20 --nostream || true
+            exit 1
+          fi
+
+    - name: 🏥 Post-Deployment Health Check
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.PORT || 22 }}
+        script: |
+          cd /root/bird
+          
+          echo "🏥 Performing health check..."
+          
+          # Wait a bit more for full initialization
+          sleep 15
+          
+          # Check bot status
+          BOT_STATUS=$(pm2 list | grep birdeye | awk '{print $10}' || echo "stopped")
+          echo "🤖 Bot Status: $BOT_STATUS"
+          
+          # Get system metrics
+          CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | awk -F'%' '{print $1}' || echo "N/A")
+          MEMORY_USAGE=$(free -m | awk 'NR==2{printf "%.1f%%", $3*100/$2 }' || echo "N/A")
+          DISK_USAGE=$(df -h / | awk 'NR==2 {print $5}' || echo "N/A")
+          UPTIME=$(uptime -p || echo "N/A")
+          
+          echo "📊 System Metrics:"
+          echo "  🖥️ CPU: ${CPU_USAGE}%"
+          echo "  💾 Memory: ${MEMORY_USAGE}"
+          echo "  💿 Disk: ${DISK_USAGE}"
+          echo "  ⏱️ Uptime: ${UPTIME}"
+          
+          # Run auto-deploy notification
+          echo "📱 Sending deployment notification..."
+          ./scripts/auto-deploy.sh status
+          
+          echo "✅ Health check completed"
+
+    - name: 📊 Deployment Summary
+      if: always()
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.PORT || 22 }}
+        script: |
+          cd /root/bird
+          
+          echo "📊 Final Deployment Summary:"
+          echo "================================"
+          
+          # Get commit info
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+          DEPLOY_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+          
+          echo "📋 Commit: $COMMIT_HASH"
+          echo "💬 Message: $COMMIT_MSG"
+          echo "⏰ Deploy Time: $DEPLOY_TIME"
+          
+          # Final bot status
+          if pm2 list | grep -q "birdeye.*online"; then
+            echo "🎉 DEPLOYMENT SUCCESSFUL! Bot is running."
+            
+            # Send success notification
+            ./scripts/auto-deploy.sh webhook
+          else
+            echo "💥 DEPLOYMENT FAILED! Bot is not running."
+            
+            # Show recent logs
+            echo "📝 Recent logs:"
+            pm2 logs birdeye --lines 10 --nostream || true
+            
+            exit 1
+          fi

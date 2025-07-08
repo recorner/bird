@@ -141,46 +141,63 @@ send_notification() {
         notification+="🚨 **Error Details**:\n"
         notification+="\`$message\`\n\n"
         
-        notification+="� **System Status**:\n"
+        notification+="📊 **System Status**:\n"
         notification+="🖥️ CPU: ${cpu_usage}%\n"
         notification+="💾 Memory: ${memory_usage}\n"
         notification+="💿 Disk: ${disk_usage}\n"
         notification+="⏱️ Uptime: ${uptime}\n\n"
         
-        notification+="👨‍� **Action Required**: Check deployment logs\n"
+        notification+="👨‍💻 **Action Required**: Check deployment logs\n"
         notification+="⚡ **Previous version may still be running**"
     fi
     
-    # Send notification using the bot's notification system
-    node -e "
-        require('dotenv').config();
-        const axios = require('axios');
+    # Send notification using curl (more reliable than axios)
+    if [ -f ".env" ] && grep -q "BOT_TOKEN" .env && grep -q "GROUP_ID" .env; then
+        local bot_token=$(grep "BOT_TOKEN=" .env | cut -d'=' -f2 | tr -d '"')
+        local group_id=$(grep "GROUP_ID=" .env | cut -d'=' -f2 | tr -d '"')
         
-        async function sendNotification() {
-            try {
-                if (!process.env.BOT_TOKEN || !process.env.GROUP_ID) {
-                    console.log('Bot token or group ID not configured');
-                    return;
-                }
+        if [ ! -z "$bot_token" ] && [ ! -z "$group_id" ]; then
+            # Clean the notification message for JSON
+            local clean_notification=$(echo "$notification" | sed 's/"/\\"/g' | sed 's/`/\\`/g')
+            
+            # Send notification with curl
+            local response=$(curl -s --connect-timeout 10 --max-time 30 -X POST \
+                "https://api.telegram.org/bot${bot_token}/sendMessage" \
+                -H "Content-Type: application/json" \
+                -d "{
+                    \"chat_id\": \"${group_id}\",
+                    \"text\": \"${clean_notification}\",
+                    \"parse_mode\": \"Markdown\",
+                    \"disable_web_page_preview\": true
+                }" 2>/dev/null)
+            
+            if echo "$response" | grep -q '"ok":true'; then
+                log_success "✅ Deployment notification sent successfully"
+            else
+                log_warning "⚠️ Markdown notification failed, trying plain text..."
                 
-                const message = \`$notification\`;
-                const url = \`https://api.telegram.org/bot\${process.env.BOT_TOKEN}/sendMessage\`;
+                # Fallback to plain text
+                local simple_notification=$(echo "$notification" | sed 's/[*_`\[\]]//g')
+                local fallback_response=$(curl -s --connect-timeout 5 --max-time 15 -X POST \
+                    "https://api.telegram.org/bot${bot_token}/sendMessage" \
+                    -H "Content-Type: application/json" \
+                    -d "{
+                        \"chat_id\": \"${group_id}\",
+                        \"text\": \"${simple_notification}\"
+                    }" 2>/dev/null)
                 
-                await axios.post(url, {
-                    chat_id: process.env.GROUP_ID,
-                    text: message,
-                    parse_mode: 'Markdown',
-                    disable_web_page_preview: true
-                });
-                
-                console.log('Deployment notification sent successfully');
-            } catch (error) {
-                console.error('Failed to send notification:', error.message);
-            }
-        }
-        
-        sendNotification();
-    " 2>/dev/null || log_warning "Failed to send Telegram notification"
+                if echo "$fallback_response" | grep -q '"ok":true'; then
+                    log_success "✅ Plain text notification sent successfully"
+                else
+                    log_error "❌ Failed to send notification: $(echo "$fallback_response" | jq -r '.description' 2>/dev/null || echo 'Unknown error')"
+                fi
+            fi
+        else
+            log_warning "⚠️ Bot token or group ID not configured properly"
+        fi
+    else
+        log_warning "⚠️ .env file not found or missing Telegram configuration"
+    fi
 }
 
 # Function to get bot status
