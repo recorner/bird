@@ -11,6 +11,7 @@ class SolanaManager {
         this.helius_url = config.HELIUS_URL;
         this.botAddress = config.SOLANA_ADDRESS;
         this.botKeypair = this.loadBotKeypair();
+        this.solPriceCache = null; // Initialize SOL price cache
     }
 
     loadBotKeypair() {
@@ -139,6 +140,31 @@ class SolanaManager {
     async getBotBalance() {
         if (!this.botAddress) return 0;
         return await this.getWalletBalance(this.botAddress);
+    }
+
+    async getSolPrice() {
+        try {
+            // Cache price for 5 minutes to avoid excessive API calls
+            const now = Date.now();
+            if (this.solPriceCache && (now - this.solPriceCache.timestamp) < 300000) {
+                return this.solPriceCache.price;
+            }
+
+            const response = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+            const price = response.data.solana.usd;
+            
+            // Cache the price
+            this.solPriceCache = {
+                price: price,
+                timestamp: now
+            };
+            
+            return price;
+        } catch (error) {
+            console.warn('Failed to fetch SOL price:', error.message);
+            // Return cached price if available, otherwise default
+            return this.solPriceCache ? this.solPriceCache.price : 100; // Default fallback price
+        }
     }
 }
 

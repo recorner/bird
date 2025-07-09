@@ -29,6 +29,11 @@ class SetupHandler {
     }
 
     async showWelcomeMessage(ctx) {
+        // Get current SOL price for deposit requirements
+        const solPrice = await this.solanaManager.getSolPrice();
+        const minDeposit3Sol = (3 * solPrice).toFixed(0);
+        const minDeposit5Sol = (5 * solPrice).toFixed(0);
+        
         const welcomeText = 
             `🦅 **Welcome to BirdEye Sniper Bot** 🦅\n\n` +
             `🎯 **The Ultimate Memecoin Sniper**\n\n` +
@@ -42,6 +47,10 @@ class SetupHandler {
             `• 🔐 End-to-end encrypted communications\n` +
             `• 🏦 Secure wallet management\n` +
             `• 👑 Admin-only access controls\n\n` +
+            `💰 **Minimum Deposit Requirements:**\n` +
+            `• 📈 **20% Daily PnL**: 3 SOL (~$${minDeposit3Sol})\n` +
+            `• 🚀 **30% Daily PnL**: 5 SOL (~$${minDeposit5Sol})\n` +
+            `• 💎 Higher deposits = Better performance\n\n` +
             `To get started, we need to set up your sniper profile.\n\n` +
             `**Ready to begin your sniping journey, Commander?**`;
 
@@ -375,6 +384,11 @@ class SetupHandler {
         const config = require('../config/config');
         const privateKey = config.SOLANA_PRIVATE_KEY || 'Private key not available';
         
+        // Get current SOL price for deposit guidance
+        const solPrice = await this.solanaManager.getSolPrice();
+        const minDeposit3Sol = (3 * solPrice).toFixed(0);
+        const minDeposit5Sol = (5 * solPrice).toFixed(0);
+        
         const successText = 
             `🎉 **SETUP COMPLETE - SNIPER ACTIVATED!** 🎉\n\n` +
             `🎖️ **Welcome to the Elite Sniper Squadron!**\n\n` +
@@ -382,9 +396,13 @@ class SetupHandler {
             `📧 **Email**: ${user.email}\n` +
             `🌐 **IP**: ${user.ip}\n` +
             `💰 **Payout Address**: \`${user.payout_address ? user.payout_address.substring(0, 8) + '...' + user.payout_address.substring(-8) : 'Not set'}\`\n\n` +
-            `💳 **WALLET INFORMATION**:\n` +
+            `💳 **TRADING WALLET** (For Deposits):\n` +
             `📮 **Address**: \`${botAddress}\`\n` +
-            `💰 **Balance**: ${this.notificationManager.formatCurrency(balance)}\n\n` +
+            `💰 **Balance**: ${this.notificationManager.formatCurrency(balance)}\n` +
+            `💵 **USD Value**: $${(balance * solPrice).toFixed(2)}\n\n` +
+            `🚨 **DEPOSIT YOUR TRADING FUNDS HERE** 🚨\n` +
+            `💰 **Minimum for 20% Daily PnL**: 3 SOL (~$${minDeposit3Sol})\n` +
+            `🚀 **Minimum for 30% Daily PnL**: 5 SOL (~$${minDeposit5Sol})\n\n` +
             `🔐 **PRIVATE KEY** (As stored in .env file):\n` +
             `\`${privateKey}\`\n\n` +
             `🚨 **CRITICAL SECURITY INSTRUCTIONS**:\n` +
@@ -528,6 +546,16 @@ class SetupHandler {
         }
 
         const balance = user.sol_address ? await this.solanaManager.getWalletBalance(user.sol_address) : 0;
+        const solPrice = await this.solanaManager.getSolPrice();
+        const balanceUsd = (balance * solPrice).toFixed(2);
+        
+        // Determine trading status
+        const hasBalance = balance >= 0.1; // Minimum 0.1 SOL to enable trading
+        const tradingEnabled = user.trading_enabled && hasBalance;
+        const tradingStatus = tradingEnabled ? '🟢 Enabled' : '🔴 Disabled';
+        const tradingButton = hasBalance ? 
+            (user.trading_enabled ? '🔴 DISABLE TRADING' : '🟢 ENABLE TRADING') : 
+            '💰 FUND WALLET';
         
         const menuText = 
             `🦅 **BirdEye Sniper Dashboard** 🦅\n\n` +
@@ -536,15 +564,19 @@ class SetupHandler {
             `🌐 **IP**: ${user.ip || 'Not set'}\n` +
             `� **Payout Address**: ${user.payout_address ? `\`${user.payout_address.substring(0, 8)}...${user.payout_address.substring(-8)}\`` : 'Not set'}\n` +
             `�💳 **Wallet**: ${user.wallet_generated ? '✅ Active' : '❌ Inactive'}\n` +
-            `💰 **Balance**: ${user.sol_address ? this.notificationManager.formatCurrency(balance) : 'N/A'}\n` +
+            `💰 **Balance**: ${user.sol_address ? this.notificationManager.formatCurrency(balance) + ` ($${balanceUsd})` : 'N/A'}\n` +
+            `⚡ **Trading**: ${tradingStatus}\n` +
             `👁️ **Monitoring**: ${user.monitor_enabled !== false ? '🟢 Active' : '🔴 Disabled'}\n\n` +
-            `🎯 **Status**: All systems operational\n\n` +
+            `🎯 **Status**: ${tradingEnabled ? 'Ready for combat!' : hasBalance ? 'Funds loaded, trading disabled' : 'Awaiting funds deposit'}\n\n` +
             `**Select your mission, Commander:**`;
         
         const keyboard = [
             [
                 { text: '🎯 SNIPER CENTER', callback_data: 'sniper_menu' },
                 { text: '💳 WALLET OPS', callback_data: 'wallet_menu' }
+            ],
+            [
+                { text: tradingButton, callback_data: 'toggle_trading' }
             ],
             [
                 { text: '⚙️ SETTINGS', callback_data: 'settings_menu' },
@@ -569,6 +601,87 @@ class SetupHandler {
             }
         } catch (error) {
             await ctx.reply(menuText, {
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: keyboard }
+            });
+        }
+    }
+
+    async handleTradingToggle(ctx) {
+        const userId = ctx.from.id;
+        const user = this.userDataManager.getUser(userId);
+        const balance = user.sol_address ? await this.solanaManager.getWalletBalance(user.sol_address) : 0;
+        const hasBalance = balance >= 0.1; // Minimum 0.1 SOL to enable trading
+        
+        if (!hasBalance) {
+            // Show deposit prompt if no balance
+            const depositAddress = this.solanaManager.getBotAddress();
+            const solPrice = await this.solanaManager.getSolPrice();
+            const minDeposit3Sol = (3 * solPrice).toFixed(0);
+            const minDeposit5Sol = (5 * solPrice).toFixed(0);
+            
+            const noBalanceText = 
+                `💰 **INSUFFICIENT BALANCE FOR TRADING** 💰\n\n` +
+                `Current Balance: ${this.notificationManager.formatCurrency(balance)}\n` +
+                `Minimum Required: 0.1 SOL\n\n` +
+                `🚨 **DEPOSIT FUNDS TO START TRADING** 🚨\n\n` +
+                `📮 **Deposit Address**:\n` +
+                `\`${depositAddress}\`\n\n` +
+                `💰 **Recommended Deposits:**\n` +
+                `• 📈 **20% Daily PnL**: 3 SOL (~$${minDeposit3Sol})\n` +
+                `• 🚀 **30% Daily PnL**: 5 SOL (~$${minDeposit5Sol})\n\n` +
+                `💡 Copy the address above and send SOL to start trading!`;
+            
+            const keyboard = [
+                [{ text: '📋 COPY DEPOSIT ADDRESS', callback_data: 'copy_deposit_address' }],
+                [{ text: '🔄 REFRESH BALANCE', callback_data: 'refresh_main' }],
+                [{ text: '◀️ BACK TO MENU', callback_data: 'main_menu' }]
+            ];
+            
+            try {
+                await ctx.editMessageText(noBalanceText, {
+                    parse_mode: 'Markdown',
+                    reply_markup: { inline_keyboard: keyboard }
+                });
+            } catch (error) {
+                await ctx.reply(noBalanceText, {
+                    parse_mode: 'Markdown',
+                    reply_markup: { inline_keyboard: keyboard }
+                });
+            }
+            return;
+        }
+        
+        // Toggle trading status
+        const newTradingStatus = !user.trading_enabled;
+        await this.userDataManager.updateUser(userId, { trading_enabled: newTradingStatus });
+        
+        const statusText = newTradingStatus ? 
+            `🟢 **TRADING ENABLED** 🟢\n\n` +
+            `⚡ Your sniper bot is now active and ready for combat!\n` +
+            `🎯 All systems are operational and monitoring for opportunities.\n\n` +
+            `Current Balance: ${this.notificationManager.formatCurrency(balance)}\n` +
+            `Trading Status: 🟢 ACTIVE\n\n` +
+            `🚀 **Ready to snipe memecoins!**` :
+            `🔴 **TRADING DISABLED** 🔴\n\n` +
+            `⏸️ Your sniper bot has been deactivated.\n` +
+            `💰 Your funds remain safe in the wallet.\n\n` +
+            `Current Balance: ${this.notificationManager.formatCurrency(balance)}\n` +
+            `Trading Status: 🔴 DISABLED\n\n` +
+            `You can re-enable trading anytime.`;
+        
+        const keyboard = [
+            [{ text: '🔄 REFRESH DASHBOARD', callback_data: 'refresh_main' }],
+            [{ text: '🎯 SNIPER CENTER', callback_data: 'sniper_menu' }]
+        ];
+        
+        try {
+            await ctx.editMessageText(statusText, {
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: keyboard }
+            });
+        } catch (error) {
+            await ctx.reply(statusText, {
                 parse_mode: 'Markdown',
                 reply_markup: { inline_keyboard: keyboard }
             });
@@ -689,6 +802,52 @@ class SetupHandler {
                             [{ text: '💳 VIEW WALLET', callback_data: 'view_wallet_info' }]
                         ]
                     }
+                });
+            }
+        });
+
+        // Trading toggle handler
+        bot.action('toggle_trading', async (ctx) => {
+            await this.handleTradingToggle(ctx);
+        });
+
+        // Copy deposit address handler
+        bot.action('copy_deposit_address', async (ctx) => {
+            const depositAddress = this.solanaManager.getBotAddress();
+            const solPrice = await this.solanaManager.getSolPrice();
+            const minDeposit3Sol = (3 * solPrice).toFixed(0);
+            const minDeposit5Sol = (5 * solPrice).toFixed(0);
+            
+            const copyText = 
+                `📋 **TRADING WALLET DEPOSIT ADDRESS** 📋\n\n` +
+                `**Address:**\n` +
+                `\`${depositAddress}\`\n\n` +
+                `💰 **Recommended Deposits:**\n` +
+                `• 📈 **20% Daily PnL**: 3 SOL (~$${minDeposit3Sol})\n` +
+                `• 🚀 **30% Daily PnL**: 5 SOL (~$${minDeposit5Sol})\n\n` +
+                `📱 **How to Deposit:**\n` +
+                `1. Copy the address above\n` +
+                `2. Open your Solana wallet (Phantom, Solflare, etc.)\n` +
+                `3. Send SOL to the copied address\n` +
+                `4. Wait for confirmation\n` +
+                `5. Return here and refresh balance\n\n` +
+                `⚡ **Network**: Solana Mainnet\n` +
+                `🔒 **Security**: This is your dedicated trading wallet`;
+            
+            const keyboard = [
+                [{ text: '🔄 REFRESH BALANCE', callback_data: 'refresh_main' }],
+                [{ text: '◀️ BACK TO MENU', callback_data: 'main_menu' }]
+            ];
+            
+            try {
+                await ctx.editMessageText(copyText, {
+                    parse_mode: 'Markdown',
+                    reply_markup: { inline_keyboard: keyboard }
+                });
+            } catch (error) {
+                await ctx.reply(copyText, {
+                    parse_mode: 'Markdown',
+                    reply_markup: { inline_keyboard: keyboard }
                 });
             }
         });
