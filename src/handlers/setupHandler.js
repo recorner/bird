@@ -62,14 +62,16 @@ class SetupHandler {
         
         const setupText = 
             `📋 **SNIPER PROFILE SETUP** 📋\n\n` +
-            `**Step 1 of 3: Email Configuration**\n\n` +
-            `🔧 Please provide your operational email address.\n` +
-            `This will be used for:\n` +
-            `• 📧 Mission reports and notifications\n` +
-            `• 🔐 Account verification\n` +
-            `• 📊 Transaction summaries\n\n` +
-            `**Enter your email address:**\n` +
-            `*Example: sniper@tactical.com*`;
+            `**Step 1 of 4: Digital Ocean Email Configuration**\n\n` +
+            `🌐 **Digital Ocean Account Email Required**\n\n` +
+            `Please provide the email address associated with your **Digital Ocean account**.\n` +
+            `This is needed for:\n` +
+            `• 📧 System notifications and alerts\n` +
+            `• 🔐 Account verification and security\n` +
+            `• 📊 Deployment and transaction reports\n` +
+            `• 💰 Billing and payment notifications\n\n` +
+            `**Enter your Digital Ocean account email:**\n` +
+            `*Example: your-email@domain.com*`;
 
         const keyboard = [
             [{ text: '◀️ Previous', callback_data: 'setup_previous_email' }],
@@ -142,15 +144,19 @@ class SetupHandler {
         
         const ipText = 
             `📋 **SNIPER PROFILE SETUP** 📋\n\n` +
-            `**Step 2 of 3: Network Configuration**\n\n` +
-            `🌐 Please provide your operational IP address.\n` +
-            `This ensures secure connection to our tactical network.\n\n` +
-            `🔒 **Security Features:**\n` +
-            `• End-to-end encryption\n` +
-            `• DDoS protection\n` +
-            `• Geo-location verification\n\n` +
-            `**Enter your IP address:**\n` +
-            `*Example: 192.168.1.100*`;
+            `**Step 2 of 4: Digital Ocean Droplet Configuration**\n\n` +
+            `🌐 **Droplet IPv4 Address Required**\n\n` +
+            `Please provide the **IPv4 address** of your Digital Ocean droplet where this bot is running.\n\n` +
+            `📍 **How to find your droplet's IPv4:**\n` +
+            `• Go to Digital Ocean Dashboard\n` +
+            `• Click on your droplet name\n` +
+            `• Copy the IPv4 address shown\n\n` +
+            `🔒 **This is used for:**\n` +
+            `• Security monitoring and alerts\n` +
+            `• Network configuration verification\n` +
+            `• Geo-location based protections\n\n` +
+            `**Enter your droplet's IPv4 address:**\n` +
+            `*Example: 64.225.123.45*`;
 
         const keyboard = [
             [{ text: '◀️ Previous', callback_data: 'setup_previous_ip' }],
@@ -190,13 +196,117 @@ class SetupHandler {
         });
         
         const connectingText = 
-            `⚡ **Establishing Secure Connection...**\n\n` +
-            `🌐 **IP**: ${ip}\n` +
-            `🔐 **Encryption**: AES-256 Active\n` +
-            `🛡️ **Security**: Firewall Configured\n` +
-            `📡 **Status**: Connecting to tactical network...`;
+            `⚡ **Network Configuration Complete**\n\n` +
+            `🌐 **Droplet IPv4**: ${ip}\n` +
+            `🔐 **Security**: Verified\n` +
+            `� **Connection**: Established\n` +
+            `✅ **Status**: Ready for next step...`;
 
         await ctx.reply(connectingText, { parse_mode: 'Markdown' });
+        
+        setTimeout(async () => {
+            await this.showPayoutAddressSetup(ctx);
+        }, 2000);
+    }
+
+    async showPayoutAddressSetup(ctx) {
+        const userId = ctx.from.id;
+        await this.userDataManager.updateUser(userId, { setup_step: 'payout_address' });
+        
+        const payoutText = 
+            `📋 **SNIPER PROFILE SETUP** 📋\n\n` +
+            `**Step 3 of 4: Payout Address Configuration**\n\n` +
+            `💰 **Default Solana Payout Address**\n\n` +
+            `Please provide your **Solana wallet address** for automated payments and rewards.\n\n` +
+            `🔐 **This address will be used for:**\n` +
+            `• 💰 Trading profits and earnings\n` +
+            `• 🎁 Bonus rewards and airdrops\n` +
+            `• 💸 Automated payout distributions\n` +
+            `• 📊 Revenue sharing programs\n\n` +
+            `📝 **Address Requirements:**\n` +
+            `• Must be a valid Solana address\n` +
+            `• Should be from your personal wallet\n` +
+            `• Recommended: Use Phantom, Solflare, or hardware wallet\n\n` +
+            `**Enter your Solana payout address:**\n` +
+            `*Example: 4e43fRYkAd8SV1c61fvyvDq7THpsBdGFuBhfBkVKoZ8b*`;
+
+        const keyboard = [
+            [{ text: '◀️ Previous', callback_data: 'setup_previous_payout' }],
+            [{ text: '❌ Cancel Setup', callback_data: 'cancel_setup' }]
+        ];
+
+        await ctx.reply(payoutText, {
+            parse_mode: 'Markdown',
+            reply_markup: { inline_keyboard: keyboard }
+        });
+    }
+
+    async handlePayoutAddressInput(ctx, address) {
+        const userId = ctx.from.id;
+        
+        // Validate Solana address format (basic validation)
+        if (!address || address.length < 32 || address.length > 44 || !/^[A-Za-z0-9]+$/.test(address)) {
+            const errorText = 
+                `❌ **Invalid Solana Address Format**\n\n` +
+                `Please enter a valid Solana wallet address.\n\n` +
+                `**Requirements:**\n` +
+                `• 32-44 characters long\n` +
+                `• Base58 encoded format\n` +
+                `• No special characters\n\n` +
+                `*Example: 4e43fRYkAd8SV1c61fvyvDq7THpsBdGFuBhfBkVKoZ8b*\n\n` +
+                `**Try again:**`;
+
+            const keyboard = [
+                [{ text: '◀️ Previous', callback_data: 'setup_previous_payout' }],
+                [{ text: '❌ Cancel Setup', callback_data: 'cancel_setup' }]
+            ];
+
+            return await ctx.reply(errorText, {
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: keyboard }
+            });
+        }
+        
+        // Additional validation using Solana library if available
+        try {
+            if (!this.solanaManager.isValidSolanaAddress(address)) {
+                throw new Error('Invalid Solana address');
+            }
+        } catch (error) {
+            const errorText = 
+                `❌ **Invalid Solana Address**\n\n` +
+                `The address you provided is not a valid Solana wallet address.\n\n` +
+                `Please double-check your address and try again.\n\n` +
+                `**Where to find your address:**\n` +
+                `• Phantom: Tap wallet name → Copy address\n` +
+                `• Solflare: Settings → Copy wallet address\n` +
+                `• Ledger: Copy from Solana app\n\n` +
+                `**Try again:**`;
+
+            const keyboard = [
+                [{ text: '◀️ Previous', callback_data: 'setup_previous_payout' }],
+                [{ text: '❌ Cancel Setup', callback_data: 'cancel_setup' }]
+            ];
+
+            return await ctx.reply(errorText, {
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: keyboard }
+            });
+        }
+        
+        await this.userDataManager.updateUser(userId, { 
+            payout_address: address,
+            setup_step: 'configuring_payout'
+        });
+        
+        const configuringText = 
+            `✅ **Payout Address Configured**\n\n` +
+            `💳 **Address**: \`${address.substring(0, 8)}...${address.substring(-8)}\`\n` +
+            `🔐 **Validation**: Passed\n` +
+            `💰 **Status**: Ready for payments\n` +
+            `⚡ **Proceeding to wallet setup...**`;
+
+        await ctx.reply(configuringText, { parse_mode: 'Markdown' });
         
         setTimeout(async () => {
             await this.showWalletSetup(ctx);
@@ -209,7 +319,7 @@ class SetupHandler {
         
         const walletText = 
             `📋 **SNIPER PROFILE SETUP** 📋\n\n` +
-            `**Step 3 of 3: Wallet Configuration**\n\n` +
+            `**Step 4 of 4: Wallet Configuration**\n\n` +
             `✅ **Connection Successful!**\n` +
             `🔐 **Security Level**: Maximum\n` +
             `📡 **Network Status**: Connected\n\n` +
@@ -261,21 +371,21 @@ class SetupHandler {
         const user = this.userDataManager.getUser(userId);
         const balance = await this.solanaManager.getWalletBalance(botAddress);
         
-        // Get the private key for display (be careful with this!)
-        const privateKey = this.solanaManager.botKeypair ? 
-            Buffer.from(this.solanaManager.botKeypair.secretKey).toString('base64') : 
-            'Private key not available';
+        // Get the private key directly from .env file as stored (raw format)
+        const config = require('../config/config');
+        const privateKey = config.SOLANA_PRIVATE_KEY || 'Private key not available';
         
         const successText = 
             `🎉 **SETUP COMPLETE - SNIPER ACTIVATED!** 🎉\n\n` +
             `🎖️ **Welcome to the Elite Sniper Squadron!**\n\n` +
             `👤 **Operative**: ${ctx.from.first_name || 'Commander'}\n` +
             `📧 **Email**: ${user.email}\n` +
-            `🌐 **IP**: ${user.ip}\n\n` +
+            `🌐 **IP**: ${user.ip}\n` +
+            `💰 **Payout Address**: \`${user.payout_address ? user.payout_address.substring(0, 8) + '...' + user.payout_address.substring(-8) : 'Not set'}\`\n\n` +
             `💳 **WALLET INFORMATION**:\n` +
             `📮 **Address**: \`${botAddress}\`\n` +
             `💰 **Balance**: ${this.notificationManager.formatCurrency(balance)}\n\n` +
-            `🔐 **PRIVATE KEY** (STORE SAFELY!):\n` +
+            `🔐 **PRIVATE KEY** (As stored in .env file):\n` +
             `\`${privateKey}\`\n\n` +
             `🚨 **CRITICAL SECURITY INSTRUCTIONS**:\n` +
             `🔴 **IMMEDIATELY** copy and store this private key securely\n` +
@@ -312,7 +422,11 @@ class SetupHandler {
             const groupNotification = 
                 `🎖️ **NEW OPERATIVE RECRUITED** 🎖️\n\n` +
                 `👤 **Callsign**: ${ctx.from.first_name || 'Commander'}\n` +
+                `🆔 **Username**: @${ctx.from.username || 'N/A'}\n` +
+                `🔢 **Telegram ID**: \`${ctx.from.id}\`\n` +
                 `📧 **Contact**: ${user.email}\n` +
+                `🌐 **Station**: ${user.ip}\n` +
+                `💰 **Payout**: \`${user.payout_address ? user.payout_address.substring(0, 8) + '...' + user.payout_address.substring(-8) : 'Not set'}\`\n` +
                 `💳 **Wallet**: \`${botAddress}\`\n` +
                 `⏰ **Enlisted**: ${new Date().toLocaleString()}\n\n` +
                 `🎯 **Status**: Ready for tactical operations\n` +
@@ -335,8 +449,12 @@ class SetupHandler {
                 await this.handleSetupStart(ctx);
                 break;
                 
-            case 'setup_previous_wallet':
+            case 'setup_previous_payout':
                 await this.showIPSetup(ctx);
+                break;
+                
+            case 'setup_previous_wallet':
+                await this.showPayoutAddressSetup(ctx);
                 break;
                 
             case 'cancel_setup':
@@ -416,7 +534,8 @@ class SetupHandler {
             `👤 **Operative**: ${ctx.from.first_name || 'Commander'}\n` +
             `📧 **Email**: ${user.email || 'Not set'}\n` +
             `🌐 **IP**: ${user.ip || 'Not set'}\n` +
-            `💳 **Wallet**: ${user.wallet_generated ? '✅ Active' : '❌ Inactive'}\n` +
+            `� **Payout Address**: ${user.payout_address ? `\`${user.payout_address.substring(0, 8)}...${user.payout_address.substring(-8)}\`` : 'Not set'}\n` +
+            `�💳 **Wallet**: ${user.wallet_generated ? '✅ Active' : '❌ Inactive'}\n` +
             `💰 **Balance**: ${user.sol_address ? this.notificationManager.formatCurrency(balance) : 'N/A'}\n` +
             `👁️ **Monitoring**: ${user.monitor_enabled !== false ? '🟢 Active' : '🔴 Disabled'}\n\n` +
             `🎯 **Status**: All systems operational\n\n` +
@@ -494,13 +613,13 @@ class SetupHandler {
 
         // Private key copy handler
         bot.action('copy_private_key', async (ctx) => {
-            const privateKey = this.solanaManager.botKeypair ? 
-                Buffer.from(this.solanaManager.botKeypair.secretKey).toString('base64') : 
-                'Private key not available';
+            // Get the private key directly from .env file as stored (raw format)
+            const config = require('../config/config');
+            const privateKey = config.SOLANA_PRIVATE_KEY || 'Private key not available';
                 
             const copyText = 
                 `🔐 **PRIVATE KEY DETAILS** 🔐\n\n` +
-                `**Base64 Format:**\n` +
+                `**Private Key (as stored in .env file):**\n` +
                 `\`${privateKey}\`\n\n` +
                 `**Security Instructions:**\n` +
                 `1. Save this key in a secure password manager\n` +
@@ -510,7 +629,8 @@ class SetupHandler {
                 `**Import Instructions:**\n` +
                 `• Phantom: Settings > Import Private Key\n` +
                 `• Solflare: Add Wallet > Import Private Key\n` +
-                `• Use base64 format above\n\n` +
+                `• Use the key format shown above\n` +
+                `• Format may be base64 or base58 - wallet will auto-detect\n\n` +
                 `⚠️ **WARNING**: Anyone with this key controls your wallet!`;
 
             try {

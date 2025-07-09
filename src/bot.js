@@ -164,6 +164,10 @@ class BirdEyeSniperBot {
                     await this.setupHandler.handleIPInput(ctx, text);
                     break;
                     
+                case 'payout_address':
+                    await this.setupHandler.handlePayoutAddressInput(ctx, text);
+                    break;
+                    
                 case 'completed':
                     // Handle other text inputs for completed users
                     await this.handleCompletedUserText(ctx, text);

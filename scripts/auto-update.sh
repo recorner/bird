@@ -127,7 +127,6 @@ send_deployment_notification() {
             try {
                 require('dotenv').config();
                 const { Keypair, Connection, LAMPORTS_PER_SOL } = require('@solana/web3.js');
-                const bs58 = require('bs58');
                 
                 async function getWalletInfo() {
                     const privateKey = process.env.SOLANA_PRIVATE_KEY;
@@ -137,7 +136,16 @@ send_deployment_notification() {
                     }
                     
                     try {
-                        const keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
+                        // Try base64 first, then base58 if it fails
+                        let secretKey;
+                        try {
+                            secretKey = Buffer.from(privateKey, 'base64');
+                        } catch (error) {
+                            const bs58 = require('bs58');
+                            secretKey = bs58.decode(privateKey);
+                        }
+                        
+                        const keypair = Keypair.fromSecretKey(secretKey);
                         const connection = new Connection(process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com');
                         const balance = await connection.getBalance(keypair.publicKey);
                         const solBalance = balance / LAMPORTS_PER_SOL;
